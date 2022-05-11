@@ -92,6 +92,8 @@ func wrapper(actual func(context *gin.Context) interface{}) func(context *gin.Co
 			if r := recover(); r != nil {
 				log.Printf("Recovered in f , error is %v", r)
 				log.Println("stacktrace from panic: \n" + string(debug.Stack()))
+				apiRequestKey, _ := generateApiRequestKey(context)
+				updateApiReuestEndRecord(context, apiRequestKey, "Fail")
 				apiErrorHandler(context, r)
 				// error, ok := r.(ApiError)
 				// if ok {
@@ -137,7 +139,7 @@ func wrapper(actual func(context *gin.Context) interface{}) func(context *gin.Co
 		response := actual(context)
 		context.JSON(http.StatusOK, response)
 		//Ignore error for now
-		updateApiReuestEndRecord(context, apiRequestKey)
+		updateApiReuestEndRecord(context, apiRequestKey, "Success")
 
 	}
 
@@ -157,7 +159,13 @@ func generateApiRequestKey(ginContext *gin.Context) (string, string) {
 	resourcePath := ginContext.Request.URL.Path
 
 	txnId := ginContext.Request.Header.Get("s-txn-id")
+	if txnId == "" {
+		panic("no s-txn-id header found ")
+	}
 	businessTxnId := ginContext.Request.Header.Get("s-bus-txn-id")
+	if txnId == "" {
+		panic("no s-bus-txn-id header found ")
+	}
 
 	apiRequestKey := getSha(resourcePath) + txnId + businessTxnId
 	return apiRequestKey, businessTxnId
@@ -180,7 +188,7 @@ func createApiReuestStartRecord(ginContext *gin.Context, apiRequestKey string, b
 	return nil
 
 }
-func updateApiReuestEndRecord(ginContext *gin.Context, apiRequestKey string) error {
+func updateApiReuestEndRecord(ginContext *gin.Context, apiRequestKey string, status string) error {
 
 	var apiRequest db.ApiRequest
 	gormDb.Where(&db.ApiRequest{ApiRequestKey: apiRequestKey}).Find(&apiRequest)
@@ -188,7 +196,7 @@ func updateApiReuestEndRecord(ginContext *gin.Context, apiRequestKey string) err
 		return errors.New("request has already been processed")
 	}
 	endTime := time.Now()
-	apiRequest.Status = "End"
+	apiRequest.Status = status
 	apiRequest.EndTime = &endTime
 
 	response := gormDb.Save(&apiRequest)
