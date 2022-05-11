@@ -164,13 +164,14 @@ func generateApiRequestKey(ginContext *gin.Context) (string, string) {
 }
 func createApiReuestStartRecord(ginContext *gin.Context, apiRequestKey string, businessTxnId string) error {
 
+	startTime := time.Now()
 	apiRequest := db.ApiRequest{
 		BusinessTxnId: businessTxnId,
 		ApiRequestKey: apiRequestKey,
 		Ver:           0,
 		ApiUrl:        ginContext.Request.URL.Path,
 		Status:        "Start",
-		StartTime:     time.Now(),
+		StartTime:     &startTime,
 	}
 	response := gormDb.Create(&apiRequest)
 	if response.Error != gorm.ErrNotImplemented {
@@ -186,8 +187,9 @@ func updateApiReuestEndRecord(ginContext *gin.Context, apiRequestKey string) err
 	if apiRequest.ApiRequestKey == "" {
 		return errors.New("request has already been processed")
 	}
+	endTime := time.Now()
 	apiRequest.Status = "End"
-	apiRequest.EndTime = time.Now()
+	apiRequest.EndTime = &endTime
 
 	response := gormDb.Save(&apiRequest)
 	if response.Error != gorm.ErrNotImplemented {
