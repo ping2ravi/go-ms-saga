@@ -92,7 +92,7 @@ func wrapper(actual func(context *gin.Context) interface{}) func(context *gin.Co
 			if r := recover(); r != nil {
 				log.Printf("Recovered in f , error is %v", r)
 				log.Println("stacktrace from panic: \n" + string(debug.Stack()))
-				apiRequestKey, _ := generateApiRequestKey(context)
+				apiRequestKey, _, _ := generateApiRequestKey(context)
 				updateApiReuestEndRecord(context, apiRequestKey, "Fail")
 				apiErrorHandler(context, r)
 				// error, ok := r.(ApiError)
