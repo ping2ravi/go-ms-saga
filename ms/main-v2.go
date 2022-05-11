@@ -175,7 +175,7 @@ func generateApiRequestKey(ginContext *gin.Context) (string, string, error) {
 		return "", "", errors.New("no s-txn-id header found ")
 	}
 	businessTxnId := ginContext.Request.Header.Get("s-bus-txn-id")
-	if txnId == "" {
+	if businessTxnId == "" {
 		return "", "", errors.New("no s-bus-txn-id header found ")
 	}
 
