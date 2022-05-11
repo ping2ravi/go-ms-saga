@@ -92,7 +92,7 @@ func wrapper(actual func(context *gin.Context) interface{}) func(context *gin.Co
 			if r := recover(); r != nil {
 				log.Printf("Recovered in f , error is %v", r)
 				log.Println("stacktrace from panic: \n" + string(debug.Stack()))
-				apiErrorHandler(r)
+				apiErrorHandler(context, r)
 				// error, ok := r.(ApiError)
 				// if ok {
 				// 	if error.Code >= 500 && error.Code <= 599 {
@@ -217,4 +217,4 @@ type ApiError struct {
 	Source  string
 }
 
-type ApiErrorHandler func(interface{}) interface{}
+type ApiErrorHandler func(*gin.Context, interface{})
