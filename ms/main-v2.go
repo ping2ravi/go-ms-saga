@@ -120,20 +120,8 @@ func wrapper(actual func(context *gin.Context) interface{}) func(context *gin.Co
 				log.Printf("No error found")
 			}
 		}()
-		resourcePath := context.Request.URL.Path
-
-		log.Printf("resourcePath : %v\n", resourcePath)
-		log.Printf("resourceMethod : %v\n", context.Request.Method)
-
-		apiRequestKey, businessTxnId := generateApiRequestKey(context)
-		err := checkIfApiHasAlreadyBeenCalled(context, apiRequestKey)
-		if err != nil {
-			context.JSON(http.StatusConflict, "{'message': '"+err.Error()+"'}")
-			return
-		}
-		err = createApiReuestStartRecord(context, apiRequestKey, businessTxnId)
-		if err != nil {
-			context.JSON(http.StatusConflict, "{'message': '"+err.Error()+"'}")
+		apiRequestKey, shouldReturn := newFunction(context)
+		if shouldReturn {
 			return
 		}
 		response := actual(context)
@@ -143,6 +131,30 @@ func wrapper(actual func(context *gin.Context) interface{}) func(context *gin.Co
 
 	}
 
+}
+
+func newFunction(context *gin.Context) (string, bool) {
+	resourcePath := context.Request.URL.Path
+
+	log.Printf("resourcePath : %v\n", resourcePath)
+	log.Printf("resourceMethod : %v\n", context.Request.Method)
+
+	apiRequestKey, businessTxnId, err := generateApiRequestKey(context)
+	if err != nil {
+		context.JSON(http.StatusConflict, "{'message': '"+err.Error()+"'}")
+		return "", true
+	}
+	err = checkIfApiHasAlreadyBeenCalled(context, apiRequestKey)
+	if err != nil {
+		context.JSON(http.StatusConflict, "{'message': '"+err.Error()+"'}")
+		return "", true
+	}
+	err = createApiReuestStartRecord(context, apiRequestKey, businessTxnId)
+	if err != nil {
+		context.JSON(http.StatusConflict, "{'message': '"+err.Error()+"'}")
+		return "", true
+	}
+	return apiRequestKey, false
 }
 func checkIfApiHasAlreadyBeenCalled(ginContext *gin.Context, apiRequestKey string) error {
 
@@ -155,20 +167,20 @@ func checkIfApiHasAlreadyBeenCalled(ginContext *gin.Context, apiRequestKey strin
 
 }
 
-func generateApiRequestKey(ginContext *gin.Context) (string, string) {
+func generateApiRequestKey(ginContext *gin.Context) (string, string, error) {
 	resourcePath := ginContext.Request.URL.Path
 
 	txnId := ginContext.Request.Header.Get("s-txn-id")
 	if txnId == "" {
-		panic("no s-txn-id header found ")
+		return "", "", errors.New("no s-txn-id header found ")
 	}
 	businessTxnId := ginContext.Request.Header.Get("s-bus-txn-id")
 	if txnId == "" {
-		panic("no s-bus-txn-id header found ")
+		return "", "", errors.New("no s-bus-txn-id header found ")
 	}
 
 	apiRequestKey := getSha(resourcePath) + txnId + businessTxnId
-	return apiRequestKey, businessTxnId
+	return apiRequestKey, businessTxnId, nil
 }
 func createApiReuestStartRecord(ginContext *gin.Context, apiRequestKey string, businessTxnId string) error {
 
