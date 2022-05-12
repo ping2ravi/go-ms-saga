@@ -11,4 +11,5 @@ type ApiRequest struct {
 	Ver           int32      `gorm:"column:ver"`
 	ApiUrl        string     `gorm:"column:api_url"`
 	Status        string     `gorm:"column:status"`
+	Error         string     `gorm:"column:error"`
 }

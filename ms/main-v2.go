@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -93,7 +95,8 @@ func wrapper(actual func(context *gin.Context) interface{}) func(context *gin.Co
 				log.Printf("Recovered in f , error is %v", r)
 				log.Println("stacktrace from panic: \n" + string(debug.Stack()))
 				apiRequestKey, _, _ := generateApiRequestKey(context)
-				updateApiReuestEndRecord(context, apiRequestKey, "Fail")
+				errorMeessage := getError(r)
+				updateApiReuestEndRecord(context, apiRequestKey, "Fail", &errorMeessage)
 				apiErrorHandler(context, r)
 				// error, ok := r.(ApiError)
 				// if ok {
@@ -127,7 +130,7 @@ func wrapper(actual func(context *gin.Context) interface{}) func(context *gin.Co
 		response := actual(context)
 		context.JSON(http.StatusOK, response)
 		//Ignore error for now
-		updateApiReuestEndRecord(context, apiRequestKey, "Success")
+		updateApiReuestEndRecord(context, apiRequestKey, "Success", nil)
 
 	}
 
@@ -136,8 +139,7 @@ func wrapper(actual func(context *gin.Context) interface{}) func(context *gin.Co
 func newFunction(context *gin.Context) (string, bool) {
 	resourcePath := context.Request.URL.Path
 
-	log.Printf("resourcePath : %v\n", resourcePath)
-	log.Printf("resourceMethod : %v\n", context.Request.Method)
+	log.Printf("%v : %v\n", resourcePath, context.Request.Method)
 
 	apiRequestKey, businessTxnId, err := generateApiRequestKey(context)
 	if err != nil {
@@ -200,7 +202,7 @@ func createApiReuestStartRecord(ginContext *gin.Context, apiRequestKey string, b
 	return nil
 
 }
-func updateApiReuestEndRecord(ginContext *gin.Context, apiRequestKey string, status string) error {
+func updateApiReuestEndRecord(ginContext *gin.Context, apiRequestKey string, status string, error *string) error {
 
 	var apiRequest db.ApiRequest
 	gormDb.Where(&db.ApiRequest{ApiRequestKey: apiRequestKey}).Find(&apiRequest)
@@ -210,6 +212,7 @@ func updateApiReuestEndRecord(ginContext *gin.Context, apiRequestKey string, sta
 	endTime := time.Now()
 	apiRequest.Status = status
 	apiRequest.EndTime = &endTime
+	apiRequest.Error = *error
 
 	response := gormDb.Save(&apiRequest)
 	if response.Error != gorm.ErrNotImplemented {
@@ -217,6 +220,22 @@ func updateApiReuestEndRecord(ginContext *gin.Context, apiRequestKey string, sta
 	}
 	return nil
 
+}
+func getError(error interface{}) string {
+	apiError, ok := error.(ApiError)
+	if ok {
+		return apiError.Message
+	}
+	apiErrorString, ok := error.(string)
+	if ok {
+		return apiErrorString
+	}
+	b, err := json.Marshal(error)
+	if err != nil {
+		fmt.Println(err)
+		return "unknow error"
+	}
+	return string(b)
 }
 
 func getSha(text string) string {
